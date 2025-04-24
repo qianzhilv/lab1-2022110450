@@ -1,0 +1,397 @@
+import java.io.*;
+import java.util.*;
+
+public class Lab1 {
+    private static class Graph {
+        Map<String, Map<String, Integer>> adjList = new HashMap<>();
+        Map<String, Double> pageRanks = new HashMap<>();
+    }
+
+    private static Graph graph = new Graph();
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Enter file path: ");
+        String filePath = scanner.nextLine().trim();
+        buildGraph(filePath);
+
+        while (true) {
+            System.out.println("\n1. Show Graph\n2. Query Bridge Words\n3. Generate New Text\n4. Shortest Path\n5. PageRank\n6. Random Walk\n0. Exit");
+            System.out.print("Choose function: ");
+            int choice = scanner.nextInt();
+            scanner.nextLine(); // consume newline
+
+            switch (choice) {
+                case 1:
+                    showDirectedGraph();
+                    break;
+                case 2:
+                    System.out.print("Enter word1: ");
+                    String word1 = scanner.nextLine().toLowerCase();
+                    System.out.print("Enter word2: ");
+                    String word2 = scanner.nextLine().toLowerCase();
+                    System.out.println(queryBridgeWords(word1, word2));
+                    break;
+                case 3:
+                    System.out.print("Enter text: ");
+                    String inputText = scanner.nextLine();
+                    System.out.println(generateNewText(inputText));
+                    break;
+                case 4:
+                    System.out.print("Enter start word: ");
+                    String start = scanner.nextLine().toLowerCase();
+                    System.out.print("Enter end word: ");
+                    String end = scanner.nextLine().toLowerCase();
+                    System.out.println(calcShortestPath(start, end));
+                    break;
+                case 5:
+                    System.out.print("Enter word: ");
+                    String word = scanner.nextLine().toLowerCase();
+                    System.out.printf("PageRank: %.4f\n", calcPageRank(word));
+                    break;
+                case 6:
+                    System.out.println(randomWalk());
+                    break;
+                case 0:
+                    return;
+                default:
+                    System.out.println("Invalid choice!");
+            }
+        }
+    }
+
+    private static void buildGraph(String filePath) {
+        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+            String line;
+            List<String> words = new ArrayList<>();
+            while ((line = br.readLine()) != null) {
+                String[] tokens = line.replaceAll("[^a-zA-Z ]", "").toLowerCase().split("\\s+");
+                for (String token : tokens) {
+                    if (!token.isEmpty()) words.add(token);
+                }
+            }
+
+            for (int i = 0; i < words.size() - 1; i++) {
+                String from = words.get(i);
+                String to = words.get(i + 1);
+                graph.adjList.putIfAbsent(from, new HashMap<>());
+                graph.adjList.get(from).put(to, graph.adjList.get(from).getOrDefault(to, 0) + 1);
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading file: " + e.getMessage());
+        }
+    }
+
+    public static void showDirectedGraph() {
+        // CLI文本展示
+        System.out.println("\nGraph Structure (CLI View):");
+        for (String node : graph.adjList.keySet()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(node).append(" -> ");
+            for (Map.Entry<String, Integer> edge : graph.adjList.get(node).entrySet()) {
+                sb.append(edge.getKey())
+                        .append("(").append(edge.getValue()).append(") ")
+                        .append("-> ");
+            }
+            if (sb.length() > 4) sb.setLength(sb.length() - 3); // 移除末尾多余的箭头
+            System.out.println(sb);
+        }
+
+        // 图形文件生成（可选）
+        System.out.print("\nSave graph to image? (y/n): ");
+        Scanner scanner = new Scanner(System.in);
+        if (scanner.nextLine().trim().equalsIgnoreCase("y")) {
+            generateGraphImage();
+        }
+    }
+
+    private static void generateGraphImage() {
+        try {
+            // 生成DOT文件
+            File dotFile = new File("graph.dot");
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(dotFile))) {
+                writer.write("digraph G {\n");
+                for (String node : graph.adjList.keySet()) {
+                    for (Map.Entry<String, Integer> edge : graph.adjList.get(node).entrySet()) {
+                        writer.write(String.format(
+                                "    \"%s\" -> \"%s\" [label=\"%d\"];\n",
+                                node, edge.getKey(), edge.getValue()
+                        ));
+                    }
+                }
+                writer.write("}");
+            }
+
+            // 调用Graphviz生成图片
+            ProcessBuilder pb = new ProcessBuilder("dot", "-Tpng", "graph.dot", "-o", "graph.png");
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0) {
+                System.out.println("Graph image saved as graph.png");
+            } else {
+                System.err.println("Graphviz failed. Ensure Graphviz is installed and added to PATH.");
+            }
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Error generating graph image: " + e.getMessage());
+        }
+    }
+
+    public static String queryBridgeWords(String word1, String word2) {
+        if (!graph.adjList.containsKey(word1) || !graph.adjList.containsKey(word2)) {
+            return "No " + word1 + " or " + word2 + " in the graph!";
+        }
+
+        List<String> bridges = new ArrayList<>();
+        Map<String, Integer> word1Edges = graph.adjList.get(word1);
+        for (String candidate : word1Edges.keySet()) {
+            if (graph.adjList.containsKey(candidate) &&
+                    graph.adjList.get(candidate).containsKey(word2)) {
+                bridges.add(candidate);
+            }
+        }
+
+        if (bridges.isEmpty()) return "No bridge words from " + word1 + " to " + word2 + "!";
+        return formatBridgeWordsOutput(bridges, word1, word2);
+    }
+
+    private static String formatBridgeWordsOutput(List<String> bridges, String word1, String word2) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("The bridge words from ").append(word1).append(" to ").append(word2).append(" are: ");
+        for (int i = 0; i < bridges.size(); i++) {
+            if (i == bridges.size() - 1) {
+                sb.append("and ").append(bridges.get(i)).append(".");
+            } else {
+                sb.append(bridges.get(i)).append(", ");
+            }
+        }
+        return sb.toString();
+    }
+
+    public static String generateNewText(String inputText) {
+        String[] tokens = inputText.replaceAll("[^a-zA-Z ]", " ").toLowerCase().split("\\s+");
+        List<String> words = new ArrayList<>();
+        for (String token : tokens) {
+            if (!token.isEmpty()) words.add(token);
+        }
+
+        List<String> result = new ArrayList<>();
+        for (int i = 0; i < words.size() - 1; i++) {
+            String current = words.get(i);
+            String next = words.get(i + 1);
+            result.add(current);
+
+            List<String> bridges = new ArrayList<>();
+            if (graph.adjList.containsKey(current) && graph.adjList.containsKey(next)) {
+                for (String candidate : graph.adjList.get(current).keySet()) {
+                    if (graph.adjList.containsKey(candidate) &&
+                            graph.adjList.get(candidate).containsKey(next)) {
+                        bridges.add(candidate);
+                    }
+                }
+            }
+
+            if (!bridges.isEmpty()) {
+                Random rand = new Random();
+                String bridge = bridges.get(rand.nextInt(bridges.size()));
+                result.add(bridge);
+            }
+        }
+        result.add(words.get(words.size() - 1));
+        return String.join(" ", result);
+    }
+
+    public static String calcShortestPath(String word1, String word2) {
+        // 处理单单词模式
+        if (word2 == null || word2.isEmpty()) {
+            return calculateAllShortestPaths(word1);
+        }
+
+        // 原双单词模式逻辑
+        if (!graph.adjList.containsKey(word1)) {
+            return word1 + " not in graph!";
+        }
+        if (!graph.adjList.containsKey(word2)) {
+            return word2 + " not in graph!";
+        }
+
+        // Dijkstra算法实现（保持原有代码）
+        Map<String, Integer> dist = new HashMap<>();
+        Map<String, String> prev = new HashMap<>();
+        PriorityQueue<String> pq = new PriorityQueue<>(Comparator.comparingInt(dist::get));
+
+        for (String node : graph.adjList.keySet()) {
+            dist.put(node, Integer.MAX_VALUE);
+        }
+        dist.put(word1, 0);
+        pq.add(word1);
+
+        while (!pq.isEmpty()) {
+            String u = pq.poll();
+            if (u.equals(word2)) break;
+            if (!graph.adjList.containsKey(u)) continue;
+
+            for (Map.Entry<String, Integer> edge : graph.adjList.get(u).entrySet()) {
+                String v = edge.getKey();
+                int weight = edge.getValue();
+                int alt = dist.get(u) + weight;
+                if (alt < dist.getOrDefault(v, Integer.MAX_VALUE)) {
+                    dist.put(v, alt);
+                    prev.put(v, u);
+                    pq.add(v);
+                }
+            }
+        }
+
+        if (dist.get(word2) == Integer.MAX_VALUE) {
+            return "No path from " + word1 + " to " + word2 + "!";
+        }
+
+        List<String> path = new LinkedList<>();
+        String current = word2;
+        while (current != null) {
+            path.add(0, current);
+            current = prev.get(current);
+        }
+        return "Shortest path: " + String.join(" -> ", path) + " (Length: " + dist.get(word2) + ")";
+    }
+
+    // 新增辅助函数：处理单单词模式
+    private static String calculateAllShortestPaths(String startWord) {
+        if (!graph.adjList.containsKey(startWord)) {
+            return startWord + " not in graph!";
+        }
+
+        Map<String, Integer> dist = new HashMap<>();
+        Map<String, String> prev = new HashMap<>();
+        PriorityQueue<String> pq = new PriorityQueue<>(Comparator.comparingInt(dist::get));
+
+        // 初始化
+        for (String node : graph.adjList.keySet()) {
+            dist.put(node, Integer.MAX_VALUE);
+        }
+        dist.put(startWord, 0);
+        pq.add(startWord);
+
+        // Dijkstra核心算法
+        while (!pq.isEmpty()) {
+            String u = pq.poll();
+            if (!graph.adjList.containsKey(u)) continue;
+
+            for (Map.Entry<String, Integer> edge : graph.adjList.get(u).entrySet()) {
+                String v = edge.getKey();
+                int weight = edge.getValue();
+                int alt = dist.get(u) + weight;
+                if (alt < dist.getOrDefault(v, Integer.MAX_VALUE)) {
+                    dist.put(v, alt);
+                    prev.put(v, u);
+                    pq.add(v);
+                }
+            }
+        }
+
+        // 构建结果字符串
+        StringBuilder result = new StringBuilder();
+        result.append("Shortest paths from ").append(startWord).append(":\n");
+        for (String node : graph.adjList.keySet()) {
+            if (node.equals(startWord)) continue;
+
+            if (dist.get(node) == Integer.MAX_VALUE) {
+                result.append("  [X] ").append(node).append(": Unreachable\n");
+            } else {
+                List<String> path = new LinkedList<>();
+                String current = node;
+                while (current != null) {
+                    path.add(0, current);
+                    current = prev.get(current);
+                }
+                result.append("  [✓] ")
+                        .append(String.join(" -> ", path))
+                        .append(" (Total weight: ").append(dist.get(node)).append(")\n");
+            }
+        }
+        return result.toString();
+    }
+    public static double calcPageRank(String word) {
+        final double d = 0.85;
+        final int maxIter = 100;
+        final double tolerance = 1e-6;
+
+        Map<String, Double> pr = new HashMap<>();
+        int N = graph.adjList.size();
+        double initialPR = 1.0 / N;
+        for (String node : graph.adjList.keySet()) {
+            pr.put(node, initialPR);
+        }
+
+        for (int iter = 0; iter < maxIter; iter++) {
+            Map<String, Double> newPR = new HashMap<>();
+            double danglingSum = 0.0;
+            for (String node : graph.adjList.keySet()) {
+                if (graph.adjList.get(node).isEmpty()) {
+                    danglingSum += pr.get(node);
+                }
+            }
+
+            for (String node : graph.adjList.keySet()) {
+                double sum = 0.0;
+                for (String inNode : graph.adjList.keySet()) {
+                    if (graph.adjList.get(inNode).containsKey(node)) {
+                        int outDegree = graph.adjList.get(inNode).size();
+                        sum += pr.get(inNode) / outDegree;
+                    }
+                }
+                newPR.put(node, (1 - d) / N + d * (sum + danglingSum / N));
+            }
+
+            boolean converged = true;
+            for (String node : pr.keySet()) {
+                if (Math.abs(newPR.get(node) - pr.get(node)) > tolerance) {
+                    converged = false;
+                    break;
+                }
+            }
+            if (converged) break;
+            pr = newPR;
+        }
+
+        graph.pageRanks = pr;
+        return pr.getOrDefault(word, 0.0);
+    }
+
+    public static String randomWalk() {
+        List<String> pathNodes = new ArrayList<>();
+        Set<String> visitedEdges = new HashSet<>();
+        Random rand = new Random();
+
+        List<String> nodes = new ArrayList<>(graph.adjList.keySet());
+        if (nodes.isEmpty()) return "Graph is empty!";
+        String current = nodes.get(rand.nextInt(nodes.size()));
+        pathNodes.add(current);
+
+        while (true) {
+            if (!graph.adjList.containsKey(current) || graph.adjList.get(current).isEmpty()) {
+                break;
+            }
+
+            List<String> outEdges = new ArrayList<>(graph.adjList.get(current).keySet());
+            String next = outEdges.get(rand.nextInt(outEdges.size()));
+            String edge = current + "->" + next;
+
+            if (visitedEdges.contains(edge)) {
+                break;
+            }
+            visitedEdges.add(edge);
+            pathNodes.add(next);
+            current = next;
+        }
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("random_walk.txt"))) {
+            String output = String.join(" ", pathNodes);
+            writer.write(output);
+            return output;
+        } catch (IOException e) {
+            return "Error writing file: " + e.getMessage();
+        }
+    }
+}
