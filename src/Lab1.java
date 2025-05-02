@@ -12,7 +12,7 @@ public class Lab1 {
 
     public static void main(String[] args) {
         // 直接指定文件路径
-        String filePath = "Easy Test.txt"; // 文件需放在项目根目录下
+        String filePath = "Cursed Be The Treasure.txt"; // 文件需放在项目根目录下
 
         // 自动构建有向图
         buildGraph(filePath);
