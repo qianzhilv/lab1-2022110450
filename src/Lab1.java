@@ -5,21 +5,31 @@ public class Lab1 {
     private static class Graph {
         Map<String, Map<String, Integer>> adjList = new HashMap<>();
         Map<String, Double> pageRanks = new HashMap<>();
+        Map<String, Integer> termFrequency = new HashMap<>(); // 新增词频存储
     }
 
     private static Graph graph = new Graph();
 
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        System.out.print("Enter file path: ");
-        String filePath = scanner.nextLine().trim();
+        // 直接指定文件路径
+        String filePath = "Easy Test.txt"; // 文件需放在项目根目录下
+
+        // 自动构建有向图
         buildGraph(filePath);
 
+        // 检查图是否为空
+        if (graph.adjList.isEmpty()) {
+            System.out.println("Error: Failed to build graph from 'Easy Test.txt'");
+            return;
+        }
+
+        // 进入主菜单交互
+        Scanner scanner = new Scanner(System.in);
         while (true) {
             System.out.println("\n1. Show Graph\n2. Query Bridge Words\n3. Generate New Text\n4. Shortest Path\n5. PageRank\n6. Random Walk\n0. Exit");
             System.out.print("Choose function: ");
             int choice = scanner.nextInt();
-            scanner.nextLine(); // consume newline
+            scanner.nextLine(); // 消费换行符
 
             switch (choice) {
                 case 1:
@@ -62,21 +72,42 @@ public class Lab1 {
 
     private static void buildGraph(String filePath) {
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            String line;
             List<String> words = new ArrayList<>();
+            Map<String, Integer> termFrequency = new HashMap<>(); // 新增词频统计Map
+
+            String line;
+            // 1. 逐行读取并处理文本
             while ((line = br.readLine()) != null) {
-                String[] tokens = line.replaceAll("[^a-zA-Z ]", "").toLowerCase().split("\\s+");
+                // 移除非字母字符并转小写
+                String cleanedLine = line.replaceAll("[^a-zA-Z ]", " ").toLowerCase();
+                // 分割为单词列表
+                String[] tokens = cleanedLine.split("\\s+");
+
+                // 2. 统计词频并收集有效单词
                 for (String token : tokens) {
-                    if (!token.isEmpty()) words.add(token);
+                    if (!token.isEmpty()) { // 过滤空字符串
+                        words.add(token);     // 收集单词用于构建邻接表
+                        termFrequency.put(token, termFrequency.getOrDefault(token, 0) + 1); // 更新词频
+                    }
                 }
             }
 
+            // 3. 将词频存储到Graph对象中
+            graph.termFrequency = termFrequency;
+
+            // 4. 构建邻接表
             for (int i = 0; i < words.size() - 1; i++) {
                 String from = words.get(i);
                 String to = words.get(i + 1);
+
+                // 初始化源节点的邻接表
                 graph.adjList.putIfAbsent(from, new HashMap<>());
-                graph.adjList.get(from).put(to, graph.adjList.get(from).getOrDefault(to, 0) + 1);
+
+                // 更新边的权重（相邻出现次数+1）
+                Map<String, Integer> edges = graph.adjList.get(from);
+                edges.put(to, edges.getOrDefault(to, 0) + 1);
             }
+
         } catch (IOException e) {
             System.err.println("Error reading file: " + e.getMessage());
         }
@@ -138,33 +169,52 @@ public class Lab1 {
     }
 
     public static String queryBridgeWords(String word1, String word2) {
-        if (!graph.adjList.containsKey(word1) || !graph.adjList.containsKey(word2)) {
-            return "No " + word1 + " or " + word2 + " in the graph!";
+        // 转换为小写以统一处理
+        word1 = word1.toLowerCase();
+        word2 = word2.toLowerCase();
+
+        // 1. 检查单词存在性
+        if (!graph.adjList.containsKey(word1)) {
+            return "No " + word1 + " in the graph!";
+        }
+        if (!graph.adjList.containsKey(word2)) {
+            return "No " + word2 + " in the graph!";
         }
 
-        List<String> bridges = new ArrayList<>();
+        // 2. 遍历所有可能的桥接词
+        List<String> bridgeWords = new ArrayList<>();
         Map<String, Integer> word1Edges = graph.adjList.get(word1);
         for (String candidate : word1Edges.keySet()) {
+            // 检查候选词是否有指向word2的边
             if (graph.adjList.containsKey(candidate) &&
                     graph.adjList.get(candidate).containsKey(word2)) {
-                bridges.add(candidate);
+                bridgeWords.add(candidate);
             }
         }
 
-        if (bridges.isEmpty()) return "No bridge words from " + word1 + " to " + word2 + "!";
-        return formatBridgeWordsOutput(bridges, word1, word2);
+        // 3. 格式化输出结果
+        if (bridgeWords.isEmpty()) {
+            return "No bridge words from " + word1 + " to " + word2 + "!";
+        } else {
+            return formatBridgeWordsOutput(bridgeWords, word1, word2);
+        }
     }
 
+    // 辅助函数：格式化桥接词输出
     private static String formatBridgeWordsOutput(List<String> bridges, String word1, String word2) {
         StringBuilder sb = new StringBuilder();
         sb.append("The bridge words from ").append(word1).append(" to ").append(word2).append(" are: ");
+
         for (int i = 0; i < bridges.size(); i++) {
-            if (i == bridges.size() - 1) {
-                sb.append("and ").append(bridges.get(i)).append(".");
+            if (i == bridges.size() - 1 && bridges.size() > 1) {
+                sb.append("and ").append(bridges.get(i));
+            } else if (bridges.size() == 1) {
+                sb.append(bridges.get(i));
             } else {
                 sb.append(bridges.get(i)).append(", ");
             }
         }
+        sb.append(".");
         return sb.toString();
     }
 
@@ -313,37 +363,47 @@ public class Lab1 {
         return result.toString();
     }
     public static double calcPageRank(String word) {
-        final double d = 0.85;
+        final double d = 0.85; // 阻尼因子，可调整为实验所需值
         final int maxIter = 100;
         final double tolerance = 1e-6;
 
         Map<String, Double> pr = new HashMap<>();
         int N = graph.adjList.size();
-        double initialPR = 1.0 / N;
+        if (N == 0) return 0.0;
+
+        //=========== 改进初始PR值分配（基于词频TF）===========
+        double totalTF = graph.termFrequency.values().stream().mapToInt(Integer::intValue).sum();
         for (String node : graph.adjList.keySet()) {
-            pr.put(node, initialPR);
+            double tf = graph.termFrequency.getOrDefault(node, 0);
+            pr.put(node, tf / totalTF); // 归一化词频作为初始PR值
         }
 
         for (int iter = 0; iter < maxIter; iter++) {
             Map<String, Double> newPR = new HashMap<>();
             double danglingSum = 0.0;
+
+            // 1. 计算悬挂节点的PR总和
             for (String node : graph.adjList.keySet()) {
                 if (graph.adjList.get(node).isEmpty()) {
                     danglingSum += pr.get(node);
                 }
             }
+            double danglingContribution = d * danglingSum / N;
 
-            for (String node : graph.adjList.keySet()) {
+            // 2. 遍历所有节点更新PR值
+            for (String u : graph.adjList.keySet()) {
                 double sum = 0.0;
-                for (String inNode : graph.adjList.keySet()) {
-                    if (graph.adjList.get(inNode).containsKey(node)) {
-                        int outDegree = graph.adjList.get(inNode).size();
-                        sum += pr.get(inNode) / outDegree;
+                // 遍历所有可能指向u的节点v (B_u集合)
+                for (String v : graph.adjList.keySet()) {
+                    if (graph.adjList.get(v).containsKey(u)) { // v指向u
+                        int Lv = graph.adjList.get(v).size();
+                        sum += pr.get(v) / Lv;
                     }
                 }
-                newPR.put(node, (1 - d) / N + d * (sum + danglingSum / N));
+                newPR.put(u, (1 - d)/N + d * (sum + danglingContribution));
             }
 
+            // 3. 检查收敛
             boolean converged = true;
             for (String node : pr.keySet()) {
                 if (Math.abs(newPR.get(node) - pr.get(node)) > tolerance) {
@@ -352,11 +412,11 @@ public class Lab1 {
                 }
             }
             if (converged) break;
-            pr = newPR;
+            pr = new HashMap<>(newPR);
         }
 
         graph.pageRanks = pr;
-        return pr.getOrDefault(word, 0.0);
+        return pr.getOrDefault(word.toLowerCase(), 0.0);
     }
 
     public static String randomWalk() {
