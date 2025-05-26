@@ -2,13 +2,13 @@ import java.io.*;
 import java.util.*;
 
 public class Lab1 {
-    private static class Graph {
+    public static class Graph {
         Map<String, Map<String, Integer>> adjList = new HashMap<>();
         Map<String, Double> pageRanks = new HashMap<>();
         Map<String, Integer> termFrequency = new HashMap<>(); // 新增词频存储
     }
 
-    private static Graph graph = new Graph();
+    public static Graph graph = new Graph();
 
     public static void main(String[] args) {
         // 直接指定文件路径
@@ -70,7 +70,7 @@ public class Lab1 {
         }
     }
 
-    private static void buildGraph(String filePath) {
+    public static void buildGraph(String filePath) {
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             List<String> words = new ArrayList<>();
             Map<String, Integer> termFrequency = new HashMap<>(); // 新增词频统计Map

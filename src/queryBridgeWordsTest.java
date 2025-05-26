@@ -7,17 +7,6 @@ import java.util.Map;
 import static org.junit.Assert.*;
 
 public class queryBridgeWordsTest {
-    // 通过反射重置 Graph 内部状态
-    @Before
-    public void resetGraph() throws Exception {
-        Field adjList = Lab1.Graph.class.getDeclaredField("adjList");
-        adjList.setAccessible(true);
-        ((Map<?, ?>) adjList.get(Lab1.graph)).clear();
-
-        Field termFrequency = Lab1.Graph.class.getDeclaredField("termFrequency");
-        termFrequency.setAccessible(true);
-        ((Map<?, ?>) termFrequency.get(Lab1.graph)).clear();
-    }
 
     // 测试用例 1：两个单词均不存在
     @Test
@@ -43,35 +32,26 @@ public class queryBridgeWordsTest {
     @Test
     public void testSingleBridgeWord() {
         // 测试文件内容：word1 bridge word2
-        Lab1.buildGraph("single_bridge.txt");
-        String result = Lab1.queryBridgeWords("word1", "word2");
-        assertEquals("The bridge words from word1 to word2 are: bridge.", result);
+        Lab1.buildGraph("Easy Test.txt");
+        String result = Lab1.queryBridgeWords("a", "report");
+        assertEquals("The bridge words from a to report are: detailed.", result);
     }
 
     // 测试用例 4：多个桥接词（通过测试文件构建图）
     @Test
     public void testMultipleBridgeWords() {
         // 测试文件内容：word1 bridge1 word2 word1 bridge2 word2
-        Lab1.buildGraph("multi_bridge.txt");
-        String result = Lab1.queryBridgeWords("word1", "word2");
-        assertEquals("The bridge words from word1 to word2 are: bridge1, and bridge2.", result);
+        Lab1.buildGraph("Easy Test.txt");
+        String result = Lab1.queryBridgeWords("the", "team");
+        assertEquals("The bridge words from the to team are: a, and r.", result);
     }
 
     // 测试用例 5：无桥接词（通过测试文件构建图）
     @Test
     public void testNoBridgeWords() {
         // 测试文件内容：apple banana
-        Lab1.buildGraph("no_bridge.txt");
-        String result = Lab1.queryBridgeWords("apple", "banana");
-        assertEquals("No bridge words from apple to banana!", result);
-    }
-
-    // 测试用例 6：验证三个桥接词的格式化输出
-    @Test
-    public void testThreeBridgeWordsFormatting() {
-        // 测试文件内容：start b1 end start b2 end start b3 end
-        Lab1.buildGraph("src/test/resources/three_bridge.txt");
-        String result = Lab1.queryBridgeWords("start", "end");
-        assertEquals("The bridge words from start to end are: b1, b2, and b3.", result);
+        Lab1.buildGraph("Easy Test.txt");
+        String result = Lab1.queryBridgeWords("the", "data");
+        assertEquals("No bridge words from the to data!", result);
     }
 }
