@@ -1,6 +1,7 @@
 digraph G {
     "but" -> "the" [label="1"];
     "a" -> "detailed" [label="1"];
+    "a" -> "team" [label="1"];
     "shared" -> "the" [label="1"];
     "data" -> "wrote" [label="1"];
     "data" -> "so" [label="1"];
@@ -14,15 +15,18 @@ digraph G {
     "team" -> "but" [label="1"];
     "team" -> "requested" [label="1"];
     "it" -> "again" [label="1"];
+    "the" -> "a" [label="1"];
+    "the" -> "r" [label="1"];
     "the" -> "data" [label="1"];
-    "the" -> "scientist" [label="2"];
+    "the" -> "scientist" [label="1"];
     "the" -> "report" [label="1"];
-    "the" -> "team" [label="2"];
     "with" -> "the" [label="1"];
+    "r" -> "team" [label="1"];
     "requested" -> "more" [label="1"];
     "detailed" -> "report" [label="1"];
     "and" -> "shared" [label="1"];
     "report" -> "with" [label="1"];
     "report" -> "and" [label="1"];
     "so" -> "the" [label="1"];
+    "he" -> "scientist" [label="1"];
 }

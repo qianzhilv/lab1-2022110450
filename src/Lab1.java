@@ -307,7 +307,7 @@ public class Lab1 {
     }
 
     // 新增辅助函数：处理单单词模式
-    private static String calculateAllShortestPaths(String startWord) {
+    public static String calculateAllShortestPaths(String startWord) {
         if (!graph.adjList.containsKey(startWord)) {
             return startWord + " not in graph!";
         }
